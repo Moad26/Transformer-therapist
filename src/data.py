@@ -22,15 +22,27 @@ class EmpatheticConv(Dataset):
 
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
-        special_tokens = {
-            "pad_token": "<pad>",
-            "unk_token": "<unk>",
-            "start_token": "<start>",
-            "end_token": "<end>",
-        }
-
+        # Add special tokens if they don't exist
+        special_tokens_dict = {}
         if self.tokenizer.pad_token is None:
-            self.tokenizer.add_special_tokens(special_tokens)
+            special_tokens_dict["pad_token"] = "<pad>"
+        if self.tokenizer.unk_token is None:
+            special_tokens_dict["unk_token"] = "<unk>"
+
+        # Add custom tokens for generation
+        additional_special_tokens = []
+        if "<start>" not in self.tokenizer.get_vocab():
+            additional_special_tokens.append("<start>")
+        if "<end>" not in self.tokenizer.get_vocab():
+            additional_special_tokens.append("<end>")
+
+        if additional_special_tokens:
+            special_tokens_dict["additional_special_tokens"] = additional_special_tokens
+
+        if special_tokens_dict:
+            num_added_tokens = self.tokenizer.add_special_tokens(special_tokens_dict)
+            print(f"Added {num_added_tokens} special tokens to tokenizer")
+            print(f"New vocabulary size: {self.tokenizer.vocab_size}")
 
         self.src, self.tgt = self._preprocess_data()
 
@@ -38,8 +50,8 @@ class EmpatheticConv(Dataset):
         file_path = DATA_DIR / f"{self.split}.csv"
         if not file_path.exists():
             raise FileNotFoundError(f"Data file not found: {file_path}")
-        df = pd.read_csv(file_path)
-        df = df.sort_values(["conv_id", "utterence_id"]).reset_index(drop=True)
+        df = pd.read_csv(file_path, on_bad_lines="skip")
+        df = df.sort_values(["conv_id", "utterance_idx"]).reset_index(drop=True)
         return df
 
     def _preprocess_data(
