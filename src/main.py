@@ -233,3 +233,7 @@ def main():
     print(f"Final model saved to {final_model_path}")
 
     evaluate_model(trained_model, train_dataset, train_dataset.tokenizer, device)
+
+
+if __name__ == "__main__":
+    main()
