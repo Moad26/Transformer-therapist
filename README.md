@@ -50,7 +50,7 @@ transformer-therapist/
 1. Clone the repository and navigate to the project directory:
 
 ```bash
-git clone <https://github.com/Moad26/Transformer-therapist.git>
+git clone https://github.com/Moad26/Transformer-therapist.git
 cd transformer-therapist
 ```
 
