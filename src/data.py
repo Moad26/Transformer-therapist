@@ -20,31 +20,19 @@ class EmpatheticConv(Dataset):
         self.split = split
         self.max_seq_len = max_seq_len
 
+        # Load tokenizer and check its properties
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
-        # Add special tokens if they don't exist
-        special_tokens_dict = {}
+        # Ensure pad token is set
         if self.tokenizer.pad_token is None:
-            special_tokens_dict["pad_token"] = "<pad>"
-        if self.tokenizer.unk_token is None:
-            special_tokens_dict["unk_token"] = "<unk>"
+            self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # Add custom tokens for generation
-        additional_special_tokens = []
-        if "<start>" not in self.tokenizer.get_vocab():
-            additional_special_tokens.append("<start>")
-        if "<end>" not in self.tokenizer.get_vocab():
-            additional_special_tokens.append("<end>")
+        print(f"Tokenizer vocabulary size: {self.tokenizer.vocab_size}")
+        print(
+            f"Special tokens - BOS: {self.tokenizer.bos_token_id}, EOS: {self.tokenizer.eos_token_id}, PAD: {self.tokenizer.pad_token_id}"
+        )
 
-        if additional_special_tokens:
-            special_tokens_dict["additional_special_tokens"] = additional_special_tokens
-
-        if special_tokens_dict:
-            num_added_tokens = self.tokenizer.add_special_tokens(special_tokens_dict)
-            print(f"Added {num_added_tokens} special tokens to tokenizer")
-            print(f"New vocabulary size: {self.tokenizer.vocab_size}")
-
-        self.src, self.tgt = self._preprocess_data()
+        self.data = self._preprocess_data()
 
     def _load_data(self) -> pd.DataFrame:
         file_path = DATA_DIR / f"{self.split}.csv"
@@ -54,54 +42,116 @@ class EmpatheticConv(Dataset):
         df = df.sort_values(["conv_id", "utterance_idx"]).reset_index(drop=True)
         return df
 
-    def _preprocess_data(
-        self,
-    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+    def _preprocess_data(self) -> List[Dict[str, torch.Tensor]]:
         df = self._load_data()
         df["utterance"] = df["utterance"].str.replace("_comma_", ",")
-        convs = list()
-        for conv_id in df["conv_id"].unique().tolist():
-            df_conv = df[df["conv_id"] == conv_id]
-            convs.append(df_conv["utterance"].tolist())
 
-        patient = []
-        therapist = []
+        # Group conversations
+        conversations = {}
+        for _, row in df.iterrows():
+            conv_id = row["conv_id"]
+            if conv_id not in conversations:
+                conversations[conv_id] = []
+            conversations[conv_id].append(row["utterance"])
 
-        for conv in convs:
-            if len(conv) == 1:
+        # Create input-output pairs
+        pairs = []
+        for conv_id, utterances in conversations.items():
+            if len(utterances) < 2:
                 continue
-            if len(conv) % 2 == 1:
-                conv.pop()
-            patient += conv[0::2]
-            therapist += conv[1::2]
 
-        patient_encoding = self.tokenizer(
-            patient,
-            padding=True,
-            truncation=True,
-            max_length=self.max_seq_len,
-            return_tensors="pt",
-        )
-        therapist_encoding = self.tokenizer(
-            therapist,
-            padding=True,
-            truncation=True,
-            max_length=self.max_seq_len,
-            return_tensors="pt",
-        )
-        return patient_encoding, therapist_encoding
+            # Create pairs: patient (even indices) -> therapist (odd indices)
+            for i in range(0, len(utterances) - 1, 2):
+                if i + 1 < len(utterances):
+                    patient_text = utterances[i]
+                    therapist_text = utterances[i + 1]
+                    pairs.append((patient_text, therapist_text))
+
+        print(f"Created {len(pairs)} input-output pairs")
+
+        # Tokenize all pairs at once and check for issues
+        processed_pairs = []
+        for i, (src_text, tgt_text) in enumerate(pairs):
+            # Tokenize source (patient)
+            src_tokens = self.tokenizer(
+                src_text,
+                padding=False,
+                truncation=True,
+                max_length=self.max_seq_len,
+                return_tensors="pt",
+            )
+
+            # Tokenize target (therapist)
+            tgt_tokens = self.tokenizer(
+                tgt_text,
+                padding=False,
+                truncation=True,
+                max_length=self.max_seq_len,
+                return_tensors="pt",
+            )
+
+            # Validate token IDs
+            src_ids = src_tokens["input_ids"][0]
+            tgt_ids = tgt_tokens["input_ids"][0]
+
+            if src_ids.max().item() >= self.tokenizer.vocab_size:
+                print(
+                    f"WARNING: Skipping pair {i} - source token ID {src_ids.max().item()} >= vocab_size {self.tokenizer.vocab_size}"
+                )
+                continue
+
+            if tgt_ids.max().item() >= self.tokenizer.vocab_size:
+                print(
+                    f"WARNING: Skipping pair {i} - target token ID {tgt_ids.max().item()} >= vocab_size {self.tokenizer.vocab_size}"
+                )
+                continue
+
+            processed_pairs.append(
+                {
+                    "src_input_ids": src_ids,
+                    "src_attention_mask": src_tokens["attention_mask"][0],
+                    "tgt_input_ids": tgt_ids,
+                    "tgt_attention_mask": tgt_tokens["attention_mask"][0],
+                }
+            )
+
+        print(f"Successfully processed {len(processed_pairs)} valid pairs")
+        return processed_pairs
 
     def __len__(self) -> int:
-        return len(self.src["input_ids"])
+        return len(self.data)
 
     def __getitem__(self, index: int):
-        src_input_ids = self.src["input_ids"][index]
-        src_attention_mask = self.src["attention_mask"][index]
-        tgt_input_ids = self.tgt["input_ids"][index]
-        tgt_attention_mask = self.tgt["attention_mask"][index]
+        item = self.data[index]
 
+        # Pad sequences to max length
+        src_input_ids = torch.zeros(self.max_seq_len, dtype=torch.long)
+        src_attention_mask = torch.zeros(self.max_seq_len, dtype=torch.long)
+        tgt_input_ids = torch.zeros(self.max_seq_len, dtype=torch.long)
+        tgt_attention_mask = torch.zeros(self.max_seq_len, dtype=torch.long)
+
+        # Fill with actual data
+        src_len = min(len(item["src_input_ids"]), self.max_seq_len)
+        tgt_len = min(len(item["tgt_input_ids"]), self.max_seq_len)
+
+        src_input_ids[:src_len] = item["src_input_ids"][:src_len]
+        src_attention_mask[:src_len] = item["src_attention_mask"][:src_len]
+        tgt_input_ids[:tgt_len] = item["tgt_input_ids"][:tgt_len]
+        tgt_attention_mask[:tgt_len] = item["tgt_attention_mask"][:tgt_len]
+
+        # Create labels for training (ignore padding tokens)
         labels = tgt_input_ids.clone()
         labels[tgt_attention_mask == 0] = -100
+
+        # Final safety check
+        if (
+            src_input_ids.max().item() >= self.tokenizer.vocab_size
+            or tgt_input_ids.max().item() >= self.tokenizer.vocab_size
+        ):
+            # Replace invalid tokens with UNK token
+            src_input_ids = torch.clamp(src_input_ids, 0, self.tokenizer.vocab_size - 1)
+            tgt_input_ids = torch.clamp(tgt_input_ids, 0, self.tokenizer.vocab_size - 1)
+            labels = torch.clamp(labels, -100, self.tokenizer.vocab_size - 1)
 
         return {
             "input_ids": src_input_ids,

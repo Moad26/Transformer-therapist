@@ -238,9 +238,27 @@ class Transformer(nn.Module):
         self.final_linear = nn.Linear(embed_dim, vocab_size)
 
     def forward(self, src: torch.Tensor, tgt: torch.Tensor):
+        # src is the input (patient utterance)
+        # tgt is the target labels (therapist response) with -100 for padding
+
         src_embedded = self.pe(self.src_embedding(src))
-        tgt_input = tgt[:, :-1]
-        tgt_embedded = self.pe(self.tgt_embedding(tgt_input))
+
+        # CRITICAL FIX: Create decoder input from target, but handle -100 labels properly
+        # For decoder input, we need actual token IDs, not -100
+        decoder_input = tgt.clone()
+        decoder_input[decoder_input == -100] = (
+            self.tokenizer.pad_token_id if hasattr(self, "tokenizer") else 0
+        )
+
+        # For training, we use teacher forcing: shift target right and use as decoder input
+        # Remove the last token from decoder input (we predict it)
+        decoder_input = decoder_input[:, :-1]
+
+        # Make sure decoder_input doesn't have any invalid token IDs
+        vocab_size = self.src_embedding.num_embeddings
+        decoder_input = torch.clamp(decoder_input, 0, vocab_size - 1)
+
+        tgt_embedded = self.pe(self.tgt_embedding(decoder_input))
 
         encoder_out = src_embedded
         for encoder_layer in self.encoder_layers:
