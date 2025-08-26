@@ -126,9 +126,18 @@ def train_model(
             labels = batch["labels"].to(device)
 
             optimizer.zero_grad()
-            logits = model(input_ids, labels)
 
-            loss = criterion(logits.reshape(-1, logits.size(-1)), labels.reshape(-1))
+            # Handle the new return format from the model
+            model_output = model(input_ids, labels)
+            if isinstance(model_output, tuple):
+                logits, adjusted_labels = model_output
+            else:
+                logits = model_output
+                adjusted_labels = labels
+
+            loss = criterion(
+                logits.reshape(-1, logits.size(-1)), adjusted_labels.reshape(-1)
+            )
 
             loss.backward()
             optimizer.step()
@@ -151,9 +160,17 @@ def train_model(
                 for batch in val_pbar:
                     input_ids = batch["input_ids"].to(device)
                     labels = batch["labels"].to(device)
-                    logits = model(input_ids, labels)
+
+                    # Handle the new return format from the model
+                    model_output = model(input_ids, labels)
+                    if isinstance(model_output, tuple):
+                        logits, adjusted_labels = model_output
+                    else:
+                        logits = model_output
+                        adjusted_labels = labels
+
                     loss = criterion(
-                        logits.reshape(-1, logits.size(-1)), labels.reshape(-1)
+                        logits.reshape(-1, logits.size(-1)), adjusted_labels.reshape(-1)
                     )
                     val_loss += loss.item()
                     val_steps += 1

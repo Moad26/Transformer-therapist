@@ -129,7 +129,6 @@ def create_model(args, vocab_size: int):
 
 def resize_model_embeddings(model, new_vocab_size: int):
     """Resize model embeddings to match new vocabulary size after adding tokens."""
-    # Get current embedding sizes
     current_src_vocab_size = model.src_embedding.num_embeddings
     current_tgt_vocab_size = model.tgt_embedding.num_embeddings
 
@@ -139,13 +138,11 @@ def resize_model_embeddings(model, new_vocab_size: int):
     ):
         print(f"Resizing embeddings from {current_src_vocab_size} to {new_vocab_size}")
 
-        # Create new embedding layers with the correct size
         embed_dim = model.src_embedding.embedding_dim
 
         new_src_embedding = torch.nn.Embedding(new_vocab_size, embed_dim)
         new_tgt_embedding = torch.nn.Embedding(new_vocab_size, embed_dim)
 
-        # Copy weights from old embeddings
         old_size = min(current_src_vocab_size, new_vocab_size)
         new_src_embedding.weight.data[:old_size] = model.src_embedding.weight.data[
             :old_size
@@ -163,11 +160,9 @@ def resize_model_embeddings(model, new_vocab_size: int):
                 new_tgt_embedding.weight.data[old_size:], mean=0, std=0.02
             )
 
-        # Replace the old embeddings
         model.src_embedding = new_src_embedding
         model.tgt_embedding = new_tgt_embedding
 
-        # Also resize the final linear layer
         if model.final_linear.out_features != new_vocab_size:
             print(
                 f"Resizing final linear layer from {model.final_linear.out_features} to {new_vocab_size}"
@@ -175,14 +170,12 @@ def resize_model_embeddings(model, new_vocab_size: int):
             old_linear = model.final_linear
             new_linear = torch.nn.Linear(old_linear.in_features, new_vocab_size)
 
-            # Copy weights for old vocabulary
             old_out_size = min(old_linear.out_features, new_vocab_size)
             new_linear.weight.data[:old_out_size] = old_linear.weight.data[
                 :old_out_size
             ]
             new_linear.bias.data[:old_out_size] = old_linear.bias.data[:old_out_size]
 
-            # Initialize new token weights
             if new_vocab_size > old_linear.out_features:
                 torch.nn.init.normal_(
                     new_linear.weight.data[old_out_size:], mean=0, std=0.02
@@ -220,7 +213,6 @@ def evaluate_model(model, dataset, tokenizer, device: str, num_samples: int = 5)
         input_text = tokenizer.decode(input_ids[0], skip_special_tokens=True)
 
         with torch.no_grad():
-            # Use existing BOS and EOS tokens
             start_token = (
                 tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 0
             )

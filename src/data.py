@@ -20,7 +20,6 @@ class EmpatheticConv(Dataset):
         self.split = split
         self.max_seq_len = max_seq_len
 
-        # Load tokenizer and check its properties
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
         # Ensure pad token is set
@@ -46,7 +45,6 @@ class EmpatheticConv(Dataset):
         df = self._load_data()
         df["utterance"] = df["utterance"].str.replace("_comma_", ",")
 
-        # Group conversations
         conversations = {}
         for _, row in df.iterrows():
             conv_id = row["conv_id"]
@@ -54,13 +52,11 @@ class EmpatheticConv(Dataset):
                 conversations[conv_id] = []
             conversations[conv_id].append(row["utterance"])
 
-        # Create input-output pairs
         pairs = []
         for conv_id, utterances in conversations.items():
             if len(utterances) < 2:
                 continue
 
-            # Create pairs: patient (even indices) -> therapist (odd indices)
             for i in range(0, len(utterances) - 1, 2):
                 if i + 1 < len(utterances):
                     patient_text = utterances[i]
@@ -69,10 +65,8 @@ class EmpatheticConv(Dataset):
 
         print(f"Created {len(pairs)} input-output pairs")
 
-        # Tokenize all pairs at once and check for issues
         processed_pairs = []
         for i, (src_text, tgt_text) in enumerate(pairs):
-            # Tokenize source (patient)
             src_tokens = self.tokenizer(
                 src_text,
                 padding=False,
@@ -81,7 +75,6 @@ class EmpatheticConv(Dataset):
                 return_tensors="pt",
             )
 
-            # Tokenize target (therapist)
             tgt_tokens = self.tokenizer(
                 tgt_text,
                 padding=False,
@@ -90,7 +83,6 @@ class EmpatheticConv(Dataset):
                 return_tensors="pt",
             )
 
-            # Validate token IDs
             src_ids = src_tokens["input_ids"][0]
             tgt_ids = tgt_tokens["input_ids"][0]
 

@@ -13,6 +13,8 @@ def scaled_dot_product_attention(
     d_k = Q.size(-1)
     scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k)
     if mask is not None:
+        # Ensure mask is on the same device as the scores
+        mask = mask.to(scores.device)
         scores.masked_fill_(mask == 0, float("-inf"))
     attention_weights = torch.softmax(scores, dim=-1)
     output = torch.matmul(attention_weights, V)
@@ -109,6 +111,8 @@ class CrossAttention(nn.Module):
 
 
 class PositionalEncoding(nn.Module):
+    pe: torch.Tensor  # Type annotation for the buffer
+
     def __init__(self, embed_dim: int, max_seq_len: int):
         super().__init__()
         self.embed_dim = embed_dim
@@ -185,11 +189,13 @@ class Decoder(nn.Module):
         dropout: float = 0.1,
     ):
         super().__init__()
+        # Register causal mask as a buffer so it automatically moves with the model
         causal_mask = torch.tril(torch.ones(seq_len, seq_len))
+        self.register_buffer("causal_mask", causal_mask)
 
         self.cross_attention = CrossAttention(embed_dim, num_head)
         self.masked_multi_head_att = MultiHeadAttention(
-            num_head, embed_dim, mask=causal_mask
+            num_head, embed_dim, mask=None  # We'll pass the mask dynamically
         )
 
         self.add_norm1 = nn.LayerNorm(embed_dim)
@@ -200,6 +206,14 @@ class Decoder(nn.Module):
 
     def forward(self, x: torch.Tensor, encod_out: torch.Tensor):
         residual = x
+
+        seq_len = x.size(1)
+        mask = self.causal_mask[:seq_len, :seq_len]
+
+        # Temporarily set the mask for each attention head
+        for head in self.masked_multi_head_att.list_of_self_att:
+            head.mask = mask
+
         x = self.masked_multi_head_att(x)
         x = self.add_norm1(x + residual)
 
@@ -243,15 +257,9 @@ class Transformer(nn.Module):
 
         src_embedded = self.pe(self.src_embedding(src))
 
-        # CRITICAL FIX: Create decoder input from target, but handle -100 labels properly
-        # For decoder input, we need actual token IDs, not -100
         decoder_input = tgt.clone()
-        decoder_input[decoder_input == -100] = (
-            self.tokenizer.pad_token_id if hasattr(self, "tokenizer") else 0
-        )
+        decoder_input[decoder_input == -100] = 0
 
-        # For training, we use teacher forcing: shift target right and use as decoder input
-        # Remove the last token from decoder input (we predict it)
         decoder_input = decoder_input[:, :-1]
 
         # Make sure decoder_input doesn't have any invalid token IDs
@@ -268,7 +276,9 @@ class Transformer(nn.Module):
         for decoder_layer in self.decoder_layers:
             decoder_out = decoder_layer(decoder_out, encoder_out)
 
-        return self.final_linear(decoder_out)
+        logits = self.final_linear(decoder_out)
+
+        return logits, tgt[:, 1:]
 
     def generate(
         self, src: torch.Tensor, max_len: int, start_token: int, end_token: int
@@ -290,7 +300,7 @@ class Transformer(nn.Module):
                     decoder_out = decoder_layer(decoder_out, encoder_out)
 
                 logits = self.final_linear(decoder_out)
-                next_token = torch.argmax(logits[:, -1:], dim=-1)  # Last position
+                next_token = torch.argmax(logits[:, -1:], dim=-1)
 
                 tgt = torch.cat([tgt, next_token], dim=1)
 
