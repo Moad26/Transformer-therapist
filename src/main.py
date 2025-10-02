@@ -1,13 +1,13 @@
 import argparse
 import random
-import numpy as np
-import os
-import torch
 from pathlib import Path
 
-from data import EmpatheticConv
-from train import train_model
-from model import Transformer
+import numpy as np
+import torch
+
+from src.data import EmpatheticConv
+from src.model import Transformer
+from src.train import train_model
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 MODEL_DIR = ROOT_DIR / "model"
@@ -228,7 +228,7 @@ def evaluate_model(model, dataset, tokenizer, device: str, num_samples: int = 5)
 
             response = tokenizer.decode(generated[0], skip_special_tokens=True)
 
-        print(f"Sample {i+1}:")
+        print(f"Sample {i + 1}:")
         print(f"Input: {input_text}")
         print(f"Generated Response: {response}")
         print("-" * 40)
@@ -261,7 +261,7 @@ def main():
         evaluate_model(model, train_dataset, train_dataset.tokenizer, device)
         return
     print("\nStarting training...")
-    print(f"Training configuration:")
+    print("Training configuration:")
     print(f"  Batch size: {args.batch_size}")
     print(f"  Learning rate: {args.learning_rate}")
     print(f"  Epochs: {args.num_epochs}")

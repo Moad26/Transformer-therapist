@@ -1,9 +1,10 @@
-from torch.utils.data import Dataset
-import torch
-import pandas as pd
 from pathlib import Path
+from typing import Dict, List
+
+import pandas as pd
+import torch
+from torch.utils.data import Dataset
 from transformers import AutoTokenizer
-from typing import Dict, List, Tuple, Optional
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT_DIR / "input" / "empatheticdialogues"

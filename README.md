@@ -1,84 +1,54 @@
-# Transformer-Based Therapeutic Dialogue System
+# Transformer for Empathetic Dialogue
 
-A PyTorch implementation of a transformer model designed for empathetic dialogue generation, specifically trained on therapeutic conversations to provide supportive and empathetic responses.
+A from-scratch PyTorch implementation of a transformer model trained on the EmpatheticDialogues dataset. This is an educational project demonstrating sequence-to-sequence learning for conversational AI.
 
-## Project Overview
+## What This Is
 
-This project implements a sequence-to-sequence transformer model that learns to generate empathetic responses similar to a therapist. The model is trained on the EmpatheticDialogues dataset, which contains conversations grounded in emotional situations.
+This project implements a custom transformer architecture (encoder-decoder) trained to generate empathetic responses in conversations. The model learns from the EmpatheticDialogues dataset, where one speaker shares an emotional situation and another provides supportive responses.
 
-### Key Features
-
-- Custom Transformer Architecture: Built from scratch with encoder-decoder structure
-- Empathetic Response Generation: Trained on therapeutic dialogue patterns
-- Flexible Training Pipeline: Configurable hyperparameters and training options
-- Cross-platform Support: Compatible with Windows, Linux, and macOS
-- Comprehensive Evaluation: Built-in model evaluation and sample generation
+**Important**: This is a learning project and research experiment, not a production system or therapeutic tool. The dataset contains crowdsourced empathetic conversations, not actual therapeutic dialogues.
 
 ## Project Structure
 
 ```
-transformer-therapist/
-├── src/                    # Source code
+.
+├── src/
 │   ├── data.py            # Dataset loading and preprocessing
-│   ├── main.py            # Main training script with CLI
-│   ├── model.py           # Transformer model implementation
-│   ├── train.py           # Training loop and utilities
-│   └── test.ipynb         # Jupyter notebook for testing
-├── input/                 # Data directory
-│   └── empatheticdialogues/
-│       ├── train.csv      # Training data
-│       ├── valid.csv      # Validation data
-│       └── test.csv       # Test data
-├── model/                 # Model checkpoints and saved models
-├── info/                  # Documentation and analysis
-├── visualisation/         # Training visualizations and plots
-├── make.py               # Project setup and management script
-└── requirements.txt      # Python dependencies
+│   ├── main.py            # Training script with CLI
+│   ├── model.py           # Transformer implementation
+│   └── train.py           # Training loop
+├── input/
+│   └── empatheticdialogues/  # Dataset files (train/valid/test.csv)
+├── model/                 # Saved checkpoints
+├── setup.sh              # Automated setup script
+├── pyproject.toml        # Dependencies (uv)
+└── README.md
 ```
 
-## Installation and Setup
+## Setup
 
 ### Prerequisites
 
-- Python 3.8 or higher
-- PyTorch
-- Transformers library
-- CUDA (optional, for GPU training)
+- Python 3.10+
+- [uv](https://github.com/astral-sh/uv) package manager (installed automatically by setup script)
 
-### Setup Process
+### Installation
 
-1. Clone the repository and navigate to the project directory:
+Run the setup script:
 
 ```bash
-git clone https://github.com/Moad26/Transformer-therapist.git
-cd transformer-therapist
+chmod +x setup.sh
+./setup.sh
 ```
 
-2. Set up the project environment:
+This will:
 
-```bash
-python make.py setup
-```
+1. Install uv if not present
+2. Create virtual environment and install dependencies
+3. Download and extract the EmpatheticDialogues dataset
+4. Create necessary directories
 
-This command creates necessary directories, sets up a virtual environment, and installs all dependencies from requirements.txt.
-
-3. Download the dataset:
-
-```bash
-python make.py dataset
-```
-
-Downloads and extracts the EmpatheticDialogues dataset automatically.
-
-4. Activate the virtual environment:
-
-Windows:
-
-```bash
-.venv\Scripts\activate
-```
-
-Linux/macOS:
+Activate the environment:
 
 ```bash
 source .venv/bin/activate
@@ -86,34 +56,53 @@ source .venv/bin/activate
 
 ## Usage
 
-### Training the Model
+### Training
 
-Basic training with default parameters:
+Basic training with defaults:
 
 ```bash
 cd src
 python main.py
 ```
 
-Training with custom parameters:
+Custom configuration:
 
 ```bash
-python main.py --batch_size 32 --learning_rate 5e-5 --num_epochs 100 --embed_dim 768
+python main.py \
+  --batch_size 32 \
+  --learning_rate 5e-5 \
+  --num_epochs 100 \
+  --embed_dim 768 \
+  --num_head 8 \
+  --num_layers 6
 ```
 
-### Training Parameters
+### Arguments
 
-- `--batch_size`: Training batch size (default: 16)
-- `--learning_rate`: Learning rate for optimizer (default: 1e-4)
-- `--num_epochs`: Number of training epochs (default: 50)
-- `--embed_dim`: Model embedding dimension (default: 512)
-- `--num_head`: Number of attention heads (default: 8)
-- `--num_layers`: Number of transformer layers (default: 6)
+**Data Parameters:**
+
 - `--max_seq_len`: Maximum sequence length (default: 128)
-- `--device`: Computing device (auto, cuda, cpu)
-- `--seed`: Random seed for reproducibility (default: 42)
+- `--tokenizer_name`: HuggingFace tokenizer (default: facebook/blenderbot-400M-distill)
 
-### Model Evaluation
+**Model Parameters:**
+
+- `--embed_dim`: Embedding dimension (default: 512)
+- `--num_head`: Number of attention heads (default: 8)
+- `--num_layers`: Transformer layers (default: 6)
+- `--dropout`: Dropout rate (default: 0.1)
+
+**Training Parameters:**
+
+- `--batch_size`: Batch size (default: 16)
+- `--learning_rate`: Learning rate (default: 1e-4)
+- `--num_epochs`: Training epochs (default: 50)
+
+**System:**
+
+- `--device`: Device selection: auto/cuda/cpu (default: auto)
+- `--seed`: Random seed (default: 42)
+
+### Evaluation
 
 Evaluate a trained model:
 
@@ -121,7 +110,7 @@ Evaluate a trained model:
 python main.py --eval_only --model_checkpoint ../model/final_model.pt
 ```
 
-Evaluate using the latest checkpoint:
+Or use the latest checkpoint:
 
 ```bash
 python main.py --eval_only
@@ -129,135 +118,80 @@ python main.py --eval_only
 
 ## Architecture
 
-### Model Components
+### Custom Transformer Implementation
 
-The transformer architecture consists of:
+This is a **from-scratch implementation** built for educational purposes, not using pre-built transformer layers.
 
-- **Encoder**: Processes input patient statements using multi-head attention and feed-forward layers
-- **Decoder**: Generates empathetic therapist responses with causal masking for autoregressive generation
-- **Multi-Head Attention**: Captures different aspects of emotional context across multiple attention heads
-- **Positional Encoding**: Maintains sequence order information using sinusoidal encoding
-- **Feed-Forward Networks**: Applies non-linear transformations with ReLU activation
+**Key Components:**
 
-### Technical Details
+- **Encoder**: Multi-head self-attention + feed-forward networks with layer normalization
+- **Decoder**: Masked multi-head attention + cross-attention + feed-forward networks
+- **Positional Encoding**: Sinusoidal position embeddings
+- **Multi-Head Attention**: Custom implementation that uses independent attention modules per head (differs from standard implementation which splits dimensions)
 
-- Layer normalization and residual connections for stable training
-- Configurable number of layers and attention heads
-- Dropout regularization to prevent overfitting
-- Cross-entropy loss with label smoothing
-- Adam optimizer with configurable learning rate
+**Architecture Decision**: The multi-head attention uses separate attention modules rather than dimension-splitting. This increases parameters but allows each head to operate over the full embedding space, potentially capturing richer representations at the cost of efficiency.
 
-### Dataset Processing
+### Training Details
 
-The EmpatheticDialogues dataset contains over 25,000 conversations grounded in emotional situations. The preprocessing pipeline:
+- **Loss**: Cross-entropy with padding token masking (-100)
+- **Optimizer**: Adam
+- **Early Stopping**: Monitors validation loss with configurable patience
+- **Checkpointing**: Saves best model based on validation performance
 
-- Extracts patient-therapist dialogue pairs from conversation data
-- Applies tokenization using the BlenderBot tokenizer
-- Handles special tokens for sequence boundaries
-- Implements padding and truncation for uniform sequence lengths
+## Dataset
 
-## Training Process
+The [EmpatheticDialogues dataset](https://github.com/facebookresearch/EmpatheticDialogues) contains ~25k conversations where:
 
-### Training Configuration
+- One person (speaker) describes an emotional situation
+- Another person (listener) responds empathetically
 
-- **Loss Function**: Cross-entropy loss with ignored padding tokens
-- **Optimizer**: Adam optimizer with configurable learning rate
-- **Early Stopping**: Prevents overfitting using validation loss monitoring
-- **Checkpointing**: Automatic model saving at best validation performance
-
-### Monitoring and Evaluation
-
-- Real-time training and validation loss tracking
-- Progress bars showing training metrics
-- Sample generation during evaluation phases
-- Automatic checkpoint management
-
-## Development Tools
-
-### Make Script Commands
-
-```bash
-python make.py setup      # Complete project setup
-python make.py install    # Install dependencies only
-python make.py dataset    # Download dataset
-python make.py clean      # Remove build artifacts
-python make.py help       # Display help information
-```
-
-### Project Management
-
-The make script handles:
-
-- Virtual environment creation and management
-- Directory structure initialization
-- Dataset download and extraction
-- Dependency installation and verification
-
-## Customization
-
-### Model Configuration
-
-Modify the model architecture by adjusting parameters:
-
-- Embedding dimensions for representation capacity
-- Number of attention heads for multi-aspect learning
-- Transformer layer depth for model complexity
-- Sequence length limits for memory efficiency
-
-### Training Configuration
-
-Customize training behavior:
-
-- Batch sizes for memory and convergence trade-offs
-- Learning rates for optimization stability
-- Early stopping patience for overfitting prevention
-- Device selection for computational resources
+The dataset covers 32 emotion categories. This is **not** clinical therapeutic data - it's crowdsourced conversations with emotional context.
 
 ### Data Processing
 
-Extend the data processing pipeline:
+1. Conversations are split into alternating speaker-listener pairs
+2. Speaker utterances become model inputs
+3. Listener responses become target outputs
+4. Tokenization uses BlenderBot tokenizer
+5. Sequences are padded/truncated to max_seq_len
 
-- Alternative tokenization strategies
-- Custom preprocessing methods
-- Different conversation formatting approaches
-- Additional data augmentation techniques
+## Limitations
 
-## Expected Results
+**This is a learning project with significant limitations:**
 
-The model generates responses designed to be:
+- Trained from scratch on limited data (~25k examples)
+- No comparison against pre-trained baselines
+- Evaluation only shows sample outputs (no quantitative metrics like BLEU/perplexity)
+- Simple greedy decoding (no beam search or sampling)
+- Custom architecture is less efficient than standard implementations
+- No safety filtering or content moderation
+- Not suitable for real-world deployment
 
-- **Empathetic**: Demonstrating understanding of emotional context
-- **Supportive**: Providing helpful and constructive guidance
-- **Contextually Appropriate**: Matching the tone and content of conversations
-- **Therapeutically Informed**: Following principles of supportive dialogue
+## Development
 
-### Example Interaction
+### Dependencies
 
+Managed via `pyproject.toml` with uv:
+
+```toml
+requires-python = ">=3.10"
+dependencies = [
+  "torch>=2.8.0",
+  "transformers>=4.56.2",
+  "pandas>=2.3.2",
+  "numpy>=2.2.6",
+  "tqdm>=4.67.1",
+  ...
+]
 ```
-Input: "I've been feeling really anxious about work lately"
-Generated Response: "It sounds like work has been weighing heavily on your mind. Can you tell me more about what specifically is making you feel anxious?"
+
+### Adding Dependencies
+
+```bash
+uv add <package-name>
 ```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Implement changes with appropriate tests
-4. Ensure code follows existing style conventions
-5. Submit a pull request with detailed description
-
-## Technical Requirements
-
-- Python 3.8+
-- PyTorch 1.8+
-- Transformers library
-- Additional dependencies listed in requirements.txt
 
 ## Acknowledgments
 
-This project builds upon:
-
-- The EmpatheticDialogues dataset from Facebook AI Research
-- The Transformer architecture from "Attention Is All You Need"
-- PyTorch deep learning framework
-- Hugging Face transformers library
+- EmpatheticDialogues dataset by Facebook AI Research
+- Transformer architecture from "Attention Is All You Need" (Vaswani et al., 2017)
